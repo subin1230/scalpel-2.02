@@ -587,11 +587,11 @@ int verify_ooxml_syntax(struct scalpelState *state, unsigned long long start_off
     FILE *fp = fopen(state->imagefile, "rb");
     if (!fp) return 0;
 
-    unsigned char buffer[4096];
+    unsigned char cluster[4096]; 
     unsigned long long eocd_pos = 0;
-    int result = 0;
-//4/29 2시 50분 수정
+    
     #define MAX_OOXML_LIMIT (10 * 1024 * 1024)
+    
     struct {
         unsigned int crc32;
         unsigned int comp_size;
@@ -601,15 +601,14 @@ int verify_ooxml_syntax(struct scalpelState *state, unsigned long long start_off
 
     fseeko(fp, 0, SEEK_END);
     unsigned long long total_filesize = ftello(fp);
-
+    
     unsigned long long virtual_end = start_offset + MAX_OOXML_LIMIT;
-    if (virtual_end > total_filesize) {
-        virtual_end = total_filesize;
-    }
+    if (virtual_end > total_filesize) virtual_end = total_filesize;
+
     for (long long i = 22; i < 65535 && i < (virtual_end - start_offset); i++) {
         fseeko(fp, virtual_end - i, SEEK_SET);
-        if (fread(buffer, 1, 4, fp) != 4) continue;
-        if (buffer[0] == 0x50 && buffer[1] == 0x4b && buffer[2] == 0x05 && buffer[3] == 0x06) {
+        if (fread(cluster, 1, 4, fp) != 4) continue;
+        if (cluster[0] == 0x50 && cluster[1] == 0x4b && cluster[2] == 0x05 && cluster[3] == 0x06) {
             eocd_pos = virtual_end - i;
             break;
         }
@@ -619,39 +618,26 @@ int verify_ooxml_syntax(struct scalpelState *state, unsigned long long start_off
         fclose(fp);
         return 0;
     }
-
     unsigned int cd_start;
     fseeko(fp, eocd_pos + 16, SEEK_SET);
     fread(&cd_start, 4, 1, fp);
     fseeko(fp, cd_start, SEEK_SET);
-
-    unsigned char signature[4];
-    fread(signature, 1, 4, fp);
-
-    if (signature[0] == 0x50 && signature[1] == 0x4b && signature[2] == 0x01 && signature[3] == 0x02) {
+    
+    if (fread(cluster, 1, 4, fp) == 4 && cluster[0] == 0x50 && cluster[1] == 0x4b && cluster[2] == 0x01 && cluster[3] == 0x02) {
         fseeko(fp, 12, SEEK_CUR);
         fread(&entry.crc32, 4, 1, fp);
         fread(&entry.comp_size, 4, 1, fp);
         fread(&entry.uncomp_size, 4, 1, fp);
-
-        unsigned short name_len, extra_len, comment_len;
-        fread(&name_len, 2, 1, fp);
-        fread(&extra_len, 2, 1, fp);
-        fread(&comment_len, 2, 1, fp);
-
-        fseeko(fp, 8, SEEK_CUR);
+        
+        fseeko(fp, 2 + 2 + 2 + 8, SEEK_CUR); 
         fread(&entry.rel_offset, 4, 1, fp);
-
-        // [핵심 수정] 오프셋만 맞으면 XML 검증 건너뛰고 무조건 성공 리턴
+        
         if (start_offset == (unsigned long long)entry.rel_offset) {
-            //printf("[BOIKO_SUCCESS] Offset Match at %llu! Forcing recovery...\n", start_offset);
             fclose(fp);
-            return 1; 
-        } else {
-            //printf("[BOIKO_FAIL] Offset Mismatch: Found %llu, Expected %u\n", start_offset, entry.rel_offset);
+            return 1;
         }
     }
 
     fclose(fp);
-    return result;
+    return 0; 
 }
