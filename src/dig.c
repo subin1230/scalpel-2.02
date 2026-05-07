@@ -477,6 +477,22 @@ digBuffer(struct scalpelState *state, unsigned long long lengthofbuf,
     // number of matches stored in last element of vector
     for(i = 0; i < (long)foundat[needlenum][MAX_MATCHES_PER_BUFFER]; i++) {
       startLocation = offset + (foundat[needlenum][i] - readbuffer);
+
+      // --- DOCX 전용 확인-박수빈 추가 ---
+      if(state->modeVerbose) {
+        //printf("DEBUG: Found %s at %llu. Testing Boiko Logic...\n", currentneedle->suffix, startLocation);
+      }
+      if (currentneedle->begin[0] == 0x50 && currentneedle->begin[1] == 0x4b) {
+          if (!verify_ooxml_syntax(state, startLocation)) {
+              // 검증 실패 시 아래 로직(헤더 기록)을 무시하고 다음 i로 넘어감
+              if(state->modeVerbose) {
+                //printf(">>> [SUCCESS] Boiko Logic Filtered at %llu\n", startLocation);
+              }
+              continue; 
+          }
+      }
+      // ------
+
       // found a header--record location in header offsets database
       if(state->modeVerbose) {
 #ifdef _WIN32

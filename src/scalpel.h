@@ -389,3 +389,13 @@ extern char *strsignal (int sig);
 #endif /*  ifdef _WIN32 */
 
 #endif /* ifndef SCALPEL_H */
+/* --- OOXML 구문론적 카빙을 위한 추가 구조체 (Boiko, 2023 -박수빈,kcc 논문 as 방법론) --- */
+typedef struct {
+    unsigned int relative_offset;   
+    unsigned int compressed_size;   
+    unsigned int uncompressed_size; 
+    unsigned int crc32;             
+    char filename[256];             
+} ZipEntry;
+
+int verify_ooxml_syntax(struct scalpelState *state, unsigned long long start_offset);
